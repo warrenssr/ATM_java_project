@@ -1,106 +1,66 @@
-// Transfer.java
-// Represents a transfer ATM transaction
+// Transfer.java - Part II D Transfer funds
+// Student: do transfer from my account to other account
+public class Transfer extends Transaction {
+    private Keypad keypad;
 
-public class Transfer extends Transaction
-{
-   private double amount;
-   private Keypad keypad;
-   private final static int CANCELED = 0;
+    public Transfer(int accountNumber, Screen screen, BankDatabase bank, Keypad keypad) {
+        super(accountNumber, screen, bank);
+        this.keypad = keypad;
+    }
 
-   public Transfer( int userAccountNumber, Screen atmScreen, 
-      BankDatabase atmBankDatabase, Keypad atmKeypad )
-   {
-      super( userAccountNumber, atmScreen, atmBankDatabase );
-      keypad = atmKeypad;
-   }
+    public void execute() {
+        Screen screen = getScreen();
+        BankDatabase bank = getBankDatabase();
+        int myAccount = getAccountNumber();
 
-   @Override
-   public void execute()
-   {
-      BankDatabase bankDatabase = getBankDatabase();
-      Screen screen = getScreen();
+        // Step 1 - ask user enter destination
+        screen.displayMessage("\nEnter destination account number (0 to cancel): ");
+        int toAccount = keypad.getInput();
 
-      int destinationAccountNumber = promptForDestinationAccount();
+        if (toAccount == 0) {
+            screen.displayMessageLine("\nCancel...");
+            return;
+        }
 
-      if ( destinationAccountNumber == CANCELED )
-      {
-         screen.displayMessageLine( "\nCanceling transaction..." );
-         return;
-      }
+        // cannot transfer to self
+        if (toAccount == myAccount) {
+            screen.displayMessageLine("\nCannot transfer to your own account!");
+            return;
+        }
 
-      if ( destinationAccountNumber == getAccountNumber() )
-      {
-         screen.displayMessageLine( "\nError: Cannot transfer funds to your own account." );
-         screen.displayMessageLine( "Canceling transaction..." );
-         return;
-      }
+        // check if account exist
+        if (bank.authenticateUserExists(toAccount) == false) {
+            screen.displayMessageLine("\nAccount not exist!");
+            return;
+        }
 
-      if ( !bankDatabase.authenticateUserExists( destinationAccountNumber ) )
-      {
-         screen.displayMessageLine( "\nError: Destination account does not exist." );
-         screen.displayMessageLine( "Canceling transaction..." );
-         return;
-      }
+        // Step 2 - ask amount, allow decimal like 9.90
+        screen.displayMessage("\nEnter amount to transfer (HKD, e.g. 100.50, 0 to cancel): ");
+        double amount = keypad.getDoubleInput();
 
-      amount = promptForTransferAmount();
+        if (amount == 0) {
+            screen.displayMessageLine("\nCancel...");
+            return;
+        }
 
-      if ( amount != CANCELED )
-      {
-         double availableBalance = bankDatabase.getAvailableBalance( getAccountNumber() );
+        if (amount <= 0) {
+            screen.displayMessageLine("\nAmount must > 0");
+            return;
+        }
 
-         if ( amount <= availableBalance )
-         {
-            bankDatabase.debit( getAccountNumber(), amount );
-            bankDatabase.credit( destinationAccountNumber, amount );
+        // check balance
+        double myBalance = bank.getAvailableBalance(myAccount);
+        if (amount > myBalance) {
+            screen.displayMessageLine("\nNot enough money!");
+            return;
+        }
 
-            screen.displayMessage( "\nSuccessfully transferred HKD " );
-            screen.displayMessage( String.format( "%.2f", amount ) );
-            screen.displayMessageLine( " to account " + destinationAccountNumber + "." );
-         }
-         else
-         {
-            screen.displayMessageLine( "\nInsufficient funds in your account." );
-            screen.displayMessageLine( "Canceling transaction..." );
-         }
-      }
-      else
-      {
-         screen.displayMessageLine( "\nCanceling transaction..." );
-      }
-   }
+        // do transfer
+        bank.debit(myAccount, amount);
+        bank.credit(toAccount, amount);
 
-   private int promptForDestinationAccount()
-   {
-      Screen screen = getScreen();
-      screen.displayMessage( "\nPlease enter the destination account number (or 0 to cancel): " );
-      int input = keypad.getInput();
-      return input;
-   }
-
-   private double promptForTransferAmount()
-   {
-      Screen screen = getScreen();
-      double input = 0.0;
-      boolean valid = false;
-
-      while ( !valid )
-      {
-         screen.displayMessage( "\nPlease enter transfer amount in HKD (or 0 to cancel): " );
-         input = keypad.getDoubleInput(); 
-
-         if ( input == CANCELED )
-         {
-            return CANCELED;
-         }
-         else if ( input < 0 )
-         {
-            screen.displayMessageLine( "\nInvalid amount. Amount must be greater than zero." );
-         }
-         else
-         {
-            valid = true;
-         }
-      }
-      return input;
-   }
+        screen.displayMessage("\nTransferred HKD ");
+        screen.displayDollarAmount(amount);
+        screen.displayMessageLine(" to " + toAccount + " OK.");
+    }
 }
