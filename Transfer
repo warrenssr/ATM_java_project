@@ -1,0 +1,106 @@
+// Transfer.java
+// Represents a transfer ATM transaction
+
+public class Transfer extends Transaction
+{
+   private double amount;
+   private Keypad keypad;
+   private final static int CANCELED = 0;
+
+   public Transfer( int userAccountNumber, Screen atmScreen, 
+      BankDatabase atmBankDatabase, Keypad atmKeypad )
+   {
+      super( userAccountNumber, atmScreen, atmBankDatabase );
+      keypad = atmKeypad;
+   }
+
+   @Override
+   public void execute()
+   {
+      BankDatabase bankDatabase = getBankDatabase();
+      Screen screen = getScreen();
+
+      int destinationAccountNumber = promptForDestinationAccount();
+
+      if ( destinationAccountNumber == CANCELED )
+      {
+         screen.displayMessageLine( "\nCanceling transaction..." );
+         return;
+      }
+
+      if ( destinationAccountNumber == getAccountNumber() )
+      {
+         screen.displayMessageLine( "\nError: Cannot transfer funds to your own account." );
+         screen.displayMessageLine( "Canceling transaction..." );
+         return;
+      }
+
+      if ( !bankDatabase.authenticateUserExists( destinationAccountNumber ) )
+      {
+         screen.displayMessageLine( "\nError: Destination account does not exist." );
+         screen.displayMessageLine( "Canceling transaction..." );
+         return;
+      }
+
+      amount = promptForTransferAmount();
+
+      if ( amount != CANCELED )
+      {
+         double availableBalance = bankDatabase.getAvailableBalance( getAccountNumber() );
+
+         if ( amount <= availableBalance )
+         {
+            bankDatabase.debit( getAccountNumber(), amount );
+            bankDatabase.credit( destinationAccountNumber, amount );
+
+            screen.displayMessage( "\nSuccessfully transferred HKD " );
+            screen.displayMessage( String.format( "%.2f", amount ) );
+            screen.displayMessageLine( " to account " + destinationAccountNumber + "." );
+         }
+         else
+         {
+            screen.displayMessageLine( "\nInsufficient funds in your account." );
+            screen.displayMessageLine( "Canceling transaction..." );
+         }
+      }
+      else
+      {
+         screen.displayMessageLine( "\nCanceling transaction..." );
+      }
+   }
+
+   private int promptForDestinationAccount()
+   {
+      Screen screen = getScreen();
+      screen.displayMessage( "\nPlease enter the destination account number (or 0 to cancel): " );
+      int input = keypad.getInput();
+      return input;
+   }
+
+   private double promptForTransferAmount()
+   {
+      Screen screen = getScreen();
+      double input = 0.0;
+      boolean valid = false;
+
+      while ( !valid )
+      {
+         screen.displayMessage( "\nPlease enter transfer amount in HKD (or 0 to cancel): " );
+         input = keypad.getDoubleInput(); 
+
+         if ( input == CANCELED )
+         {
+            return CANCELED;
+         }
+         else if ( input < 0 )
+         {
+            screen.displayMessageLine( "\nInvalid amount. Amount must be greater than zero." );
+         }
+         else
+         {
+            valid = true;
+         }
+      }
+      return input;
+   }
+}
